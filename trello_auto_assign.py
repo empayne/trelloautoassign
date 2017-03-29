@@ -8,6 +8,7 @@
 # assigned cards view.
 
 import os
+import time
 from trello import TrelloApi
 
 def main():
@@ -48,18 +49,25 @@ def main():
                             print 'Changed assignment of: ' + card['name']
                             total_assignments = total_assignments + 1
 
-    print 'Finished execution. Changed assignments of ' + str(total_assignments) + ' total cards.'
+    print 'Finished execution. Changed the assignment of ' + str(total_assignments) + ' total card(s).'
 
 def assign(trello, user_id, card, list_names, UNASSIGN_LIST_NAME):
     assigned = False
     card_done = is_list_done(trello, card['idList'], list_names, UNASSIGN_LIST_NAME)
     if card_done and card['idMembers'] != []:
-            trello.cards.delete_member_idMember(user_id, card['id'])
-            assigned = True
+        trello.cards.delete_member_idMember(user_id, card['id'])
+        due_date_message = update_due_date(trello, card['id'], card['due'])
+        comment(trello, card['id'], 'Unassigned user from this card. ' + due_date_message)
+        assigned = True
     elif (not card_done) and card['idMembers'] == []:
         trello.cards.new_member(card['id'], user_id)
+        comment(trello, card['id'], 'Assigned user to this card.')
         assigned = True
     return assigned
+
+def comment(trello, id, text):
+    comment_text = "[" +  time.strftime("%c") + "][TrelloAutoAssign] " + text
+    trello.cards.new_action_comment(id, comment_text)
 
 def is_list_done(trello, idList, list_names, UNASSIGN_LIST_NAME):
     # Effectively cache our result. Problems if list name changes while running.
@@ -67,5 +75,12 @@ def is_list_done(trello, idList, list_names, UNASSIGN_LIST_NAME):
         list = trello.lists.get(idList)
         list_names[idList] = list['name']
     return list_names[idList] == UNASSIGN_LIST_NAME
+
+def update_due_date(trello, id, due_date):
+    if due_date is None:
+        return ''
+    else:
+        trello.cards.update_due(id, None)
+        return 'Removed assigned due date (' + due_date + ').'
 
 main()
